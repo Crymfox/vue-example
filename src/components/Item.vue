@@ -33,7 +33,7 @@ export default {
     <li :class="{
         'bg-blue-300': isSelected,
         'flex-col items-center hover:bg-blue-100': !isSelected
-    }" class="flex text-2xl items-center list-disc w-[35rem] cursor-pointer" @click="selectItem">
+    }" class="flex text-2xl items-center list-disc custom:w-[35rem] w-fit cursor-pointer" @click="selectItem">
         <span>{{ item }}</span>
         <button v-if="isSelected" class="
             bg-red-500
