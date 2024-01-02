@@ -8,21 +8,24 @@
   export default {
     data() {
       return {
-        items: ref<string[]>([]),
+        items: ref<{key: number, value: string}[]>([]),
         item: ref<string>(''),
         search: ref<string>(''),
-        filteredItems: ref<string[]>([]),
-        loading: ref<boolean>(true)
+        filteredItems: ref<{key: number, value: string}[]>([]),
+        loading: ref<boolean>(true),
       }
     },
     mounted() {
       this.loading = true
       axios.get('https://worker.sameur-bh.workers.dev/')
         .then((response: {data: {key: string, value: string}[]}) => {
-          // JSON.parse(response.data).forEach((item: {key: string, value:string}) => {
-          //   this.items.push(item.value)
-          // })
-          this.items = response.data.map((item) => item.value)
+          this.items = response.data.map((item) => {
+            return {
+              key: parseInt(item.key),
+              value: item.value
+            }
+          })
+          this.items.sort((a, b) => a.key - b.key) // Sort by key
           this.loading = false
         }).catch((error: Error) => {
           console.log(error)
@@ -32,28 +35,53 @@
     methods: {
       addItem() {
         if (this.item === '') return
-        this.items.push(this.item)
-        axios.post('https://worker.sameur-bh.workers.dev/put', {
-          key: this.items.length.toString(),
+        axios.post('https://worker.sameur-bh.workers.dev/post', {
+          key: this.items.reduce((max, item) => item.key > max ? item.key : max, 0) + 1 + '',
           value: this.item
         }, {
           headers: {
-            'Access-Control-Allow-Origin': '*', // Required for CORS support to work
-            'Access-Control-Allow-Credentials': true, // Required for cookies, authorization headers with HTTPS
-            
+            "Content-Type": "application/json"
           }
         }).then((response) => {
           console.log(response)
         }).catch((error) => {
           console.log(error)
         })
+        this.items.push({
+          key: this.items.reduce((max, item) => item.key > max ? item.key : max, 0) + 1,
+          value: this.item
+        })
       },
       removeItem(item: string) {
-        this.items = this.items.filter((i) => i !== item)
-        this.filteredItems = this.filteredItems.filter((i) => i !== item)
+        axios.delete('https://worker.sameur-bh.workers.dev/delete', {
+          data: {
+            key: this.items.find((i) => i.value === item)?.key
+          },
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }).then((response) => {
+          console.log(response)
+        }).catch((error) => {
+          console.log(error)
+        })
+        this.items = this.items.filter((i) => i.value !== item)
+        this.filteredItems = this.filteredItems.filter((i) => i.value !== item)
       },
       clearItems() {
-        if (confirm('Are you sure you want to clear all tasks?')) this.items = []
+        if (confirm('Are you sure you want to clear all tasks?')) {
+          axios.put('https://worker.sameur-bh.workers.dev/deleteAll', {
+            headers: {
+              "Content-Type": "application/json"
+            }
+          })
+          .then((response) => {
+            console.log(response)
+          }).catch((error) => {
+            console.log(error)
+          })
+          this.items = []
+        }
       },
       updateInputValue(newValue: string) {
         this.item = newValue
@@ -65,7 +93,7 @@
         const newValue = (e.target as HTMLInputElement).value
         this.search = newValue
         this.filteredItems = this.items.filter((item) => {
-          return item.toLowerCase().includes(this.search.toLowerCase())
+          return item.value.toLowerCase().includes(this.search.toLowerCase())
         })
       },
     },
@@ -107,8 +135,8 @@
             <h1 class="text-3xl">Tasks</h1>
             <div v-if="items.length === 0 || (filteredItems.length === 0 && search !== '')" class="text-2xl my-2 text-gray-500 custom:w-[35rem] w-fit flex flex-col items-center">{{loading ? "Loading..." : "No tasks"}}</div>
             <ul v-else class="my-2">
-              <Item v-if="search === ''" v-for="item in items" :item="item" @removeFunction="removeItem" />
-              <Item v-else v-for="item in filteredItems" :item="item" @removeFunction="removeItem" />
+              <Item v-if="search === ''" v-for="item in items" :item="item.value" @removeFunction="removeItem" />
+              <Item v-else v-for="item in filteredItems" :item="item.value" @removeFunction="removeItem" />
             </ul>
             <button class="
               bg-red-500
